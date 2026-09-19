@@ -131,9 +131,18 @@ file bytes:                  FileTransferService     (data plane)
 ```
 
 No large file bytes belong in collaboration messages. `FileTransferService`,
-`FileOffer`, and `TransferHandle` are planned after the broker slice. Received
-filenames will be reduced to safe leaf names, remote paths will not be trusted,
-and received content will never be executed automatically.
+`FileOffer`, and `TransferHandle` define the data-plane boundary.
+`FileTransferMessages` creates and validates `FILE_OFFER`, `FILE_ACCEPT`, and
+`FILE_REJECT` control envelopes containing only metadata.
+
+The initial `LocalFileTransferService` is intentionally limited to clients in
+one JVM. Participants share an explicit, non-global registry containing opaque
+transfer IDs; filesystem paths are never put into offers. It computes and
+verifies SHA-256, refuses to overwrite destination files, tracks progress,
+supports cancellation, and uses a daemon worker. Received filenames must be
+safe leaf names, remote paths are never trusted, and received content is never
+executed automatically. A real cross-machine mechanism such as Magic Wormhole
+remains future work.
 
 ## Smallest useful vertical slice
 
@@ -152,7 +161,8 @@ proof.
    through the application shutdown lifecycle.
 3. **Complete:** RabbitMQ client/configuration in an isolated module, opt-in
    broker integration test, automatic recovery events, and two-process demo.
-4. Add file-transfer interfaces and a safe same-machine test implementation.
+4. **Complete:** file-transfer interfaces, control messages, validation, and a
+   safe same-machine test implementation.
 5. Review public APIs/Javadocs, add developer run instructions, and run the full
    MDI plus collaboration verification builds.
 
