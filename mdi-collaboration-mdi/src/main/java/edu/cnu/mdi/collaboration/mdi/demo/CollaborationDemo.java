@@ -12,6 +12,9 @@ import edu.cnu.mdi.collaboration.rabbitmq.RabbitMqConfiguration;
 import edu.cnu.mdi.collaboration.transport.CollaborationTransport;
 import edu.cnu.mdi.collaboration.transport.memory.InMemoryCollaborationBus;
 import edu.cnu.mdi.collaboration.transport.memory.InMemoryCollaborationTransport;
+import edu.cnu.mdi.collaboration.transfer.CollaborationFileExchange;
+import edu.cnu.mdi.collaboration.transfer.local.LocalFileTransferRegistry;
+import edu.cnu.mdi.collaboration.transfer.local.LocalFileTransferService;
 import edu.cnu.mdi.util.PropertyUtils;
 
 /** One-process, two-client MDI demonstration using the in-memory transport. */
@@ -23,6 +26,9 @@ public final class CollaborationDemo extends BaseMDIApplication {
     private InMemoryCollaborationBus bus;
     private CollaborationService aliceService;
     private CollaborationService bobService;
+    private LocalFileTransferRegistry fileRegistry;
+    private CollaborationFileExchange aliceFileExchange;
+    private CollaborationFileExchange bobFileExchange;
 
     private CollaborationDemo() {
         super(PropertyUtils.TITLE, "MDI Collaboration Demo", PropertyUtils.FRACTION, 0.75,
@@ -49,8 +55,13 @@ public final class CollaborationDemo extends BaseMDIApplication {
         Collaborator bob = participant("Bob");
         aliceService = service(alice);
         bobService = service(bob);
-        CollaborationView aliceView = new CollaborationView(aliceService, bob);
-        CollaborationView bobView = new CollaborationView(bobService, alice);
+        fileRegistry = new LocalFileTransferRegistry();
+        aliceFileExchange = new CollaborationFileExchange(aliceService,
+                new LocalFileTransferService(alice.id(), fileRegistry));
+        bobFileExchange = new CollaborationFileExchange(bobService,
+                new LocalFileTransferService(bob.id(), fileRegistry));
+        CollaborationView aliceView = new CollaborationView(aliceService, bob, aliceFileExchange);
+        CollaborationView bobView = new CollaborationView(bobService, alice, bobFileExchange);
         aliceView.setLocation(30, 30);
         bobView.setLocation(540, 30);
         aliceService.connect();
@@ -84,8 +95,11 @@ public final class CollaborationDemo extends BaseMDIApplication {
 
     @Override protected void prepareForShutdown() {
         try {
+            if (aliceFileExchange != null) aliceFileExchange.close();
+            if (bobFileExchange != null) bobFileExchange.close();
             if (aliceService != null) aliceService.close();
             if (bobService != null) bobService.close();
+            if (fileRegistry != null) fileRegistry.close();
             if (bus != null) bus.close();
         } finally {
             super.prepareForShutdown();
