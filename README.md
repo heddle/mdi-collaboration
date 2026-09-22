@@ -36,6 +36,8 @@ mvn -pl mdi-collaboration-mdi exec:java
 ```
 
 The default demo opens Alice and Bob in one JVM using the in-memory transport.
+That mode also demonstrates file offer, accept/reject, and same-machine transfer
+without placing bytes in the message transport.
 See `docs/collaboration.md` for the two-process RabbitMQ commands.
 
 See [docs/collaboration.md](docs/collaboration.md) for the architecture and

@@ -11,10 +11,15 @@ import org.junit.jupiter.api.Test;
 
 import edu.cnu.mdi.collaboration.CollaborationService;
 import edu.cnu.mdi.collaboration.model.Collaborator;
+import edu.cnu.mdi.collaboration.transfer.CollaborationFileExchange;
+import edu.cnu.mdi.collaboration.transfer.local.LocalFileTransferRegistry;
+import edu.cnu.mdi.collaboration.transfer.local.LocalFileTransferService;
 import edu.cnu.mdi.collaboration.transport.memory.InMemoryCollaborationBus;
 import edu.cnu.mdi.collaboration.transport.memory.InMemoryCollaborationTransport;
 
 class CollaborationViewTest {
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path temporaryDirectory;
+
     @Test void viewsSendAndReceiveWithoutWorkerThreadSwingAccess() throws Exception {
         Collaborator alice = person("Alice"), bob = person("Bob");
         try (var bus = new InMemoryCollaborationBus(); var a = service(alice, bus); var b = service(bob, bus)) {
@@ -53,6 +58,31 @@ class CollaborationViewTest {
         }
     }
 
+    @Test void fileOffersAppearAndCanBeAcceptedOnEdt() throws Exception {
+        Collaborator alice = person("Alice"), bob = person("Bob");
+        try (var bus = new InMemoryCollaborationBus(); var registry = new LocalFileTransferRegistry();
+             var a = service(alice, bus); var b = service(bob, bus);
+             var ax = new CollaborationFileExchange(a, new LocalFileTransferService(alice.id(), registry));
+             var bx = new CollaborationFileExchange(b, new LocalFileTransferService(bob.id(), registry))) {
+            CollaborationView[] views = new CollaborationView[2];
+            SwingUtilities.invokeAndWait(() -> {
+                views[0] = new CollaborationView(a, bob, ax);
+                views[1] = new CollaborationView(b, alice, bx);
+            });
+            a.connect().join(); b.connect().join();
+            java.nio.file.Path source = java.nio.file.Files.writeString(
+                    temporaryDirectory.resolve("shared.txt"), "shared result");
+            SwingUtilities.invokeAndWait(() -> views[0].offerFile(source));
+            awaitCondition(() -> onEdt(views[1]::pendingOfferCount) == 1);
+            var offer = onEdt(views[1]::firstPendingOffer);
+            java.nio.file.Path inbox = temporaryDirectory.resolve("inbox");
+            SwingUtilities.invokeAndWait(() -> views[1].acceptOffer(offer, inbox));
+            awaitCondition(() -> java.nio.file.Files.exists(inbox.resolve("shared.txt")));
+            assertEquals("shared result", java.nio.file.Files.readString(inbox.resolve("shared.txt")));
+            SwingUtilities.invokeAndWait(() -> { views[0].dispose(); views[1].dispose(); });
+        }
+    }
+
     private static Collaborator person(String name) {
         return new Collaborator(UUID.randomUUID(), name, "CNU");
     }
@@ -70,6 +100,16 @@ class CollaborationViewTest {
             Thread.sleep(10);
         }
         fail("Did not display: " + expected);
+    }
+
+    private static void awaitCondition(java.util.concurrent.Callable<Boolean> condition) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (System.nanoTime() < deadline) {
+            flushEdt();
+            if (condition.call()) return;
+            Thread.sleep(10);
+        }
+        fail("Condition was not satisfied");
     }
 
     private static void flushEdt() throws Exception { SwingUtilities.invokeAndWait(() -> { }); }

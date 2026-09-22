@@ -135,6 +135,13 @@ No large file bytes belong in collaboration messages. `FileTransferService`,
 `FileTransferMessages` creates and validates `FILE_OFFER`, `FILE_ACCEPT`, and
 `FILE_REJECT` control envelopes containing only metadata.
 
+`CollaborationFileExchange` joins that control plane to a selected
+`FileTransferService`. It tracks pending offers, validates that responses come
+from the intended recipient, coordinates accept/reject messages, propagates
+cancellation, and exposes removable lifecycle listeners. The MDI view marshals
+those notifications onto the EDT and provides intentionally small Send File,
+Accept, and Reject controls.
+
 The initial `LocalFileTransferService` is intentionally limited to clients in
 one JVM. Participants share an explicit, non-global registry containing opaque
 transfer IDs; filesystem paths are never put into offers. It computes and
@@ -143,6 +150,12 @@ supports cancellation, and uses a daemon worker. Received filenames must be
 safe leaf names, remote paths are never trusted, and received content is never
 executed automatically. A real cross-machine mechanism such as Magic Wormhole
 remains future work.
+
+The in-memory Alice/Bob demo enables file controls because both views share the
+same local registry. RabbitMQ demo processes currently expose chat only: their
+control plane spans processes, but the local-registry data plane intentionally
+does not. A cross-machine transfer module is required before file controls are
+enabled for that mode.
 
 ## Smallest useful vertical slice
 
