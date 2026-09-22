@@ -11,6 +11,10 @@ The repository is a multi-module build:
   two-client demonstration.
 - `mdi-collaboration-rabbitmq` contains the optional RabbitMQ network transport.
 
+The core also defines the file-transfer data plane and includes a same-machine
+`LocalFileTransferService` for deterministic tests. File bytes never travel
+through collaboration messages or RabbitMQ.
+
 The core has no RabbitMQ or MDI dependency. The MDI demo declares the RabbitMQ
 module optional so downstream applications do not inherit it automatically.
 
